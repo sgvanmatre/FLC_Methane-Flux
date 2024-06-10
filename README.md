@@ -1,1 +1,1 @@
-Open source methane flux instrument
+Open-source methane flux instrument project. 
