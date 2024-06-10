@@ -55,6 +55,7 @@ GPRS gprs;
 NB nbAccess(PRINT_AT);
 HttpClient http(client, server, port);
 
+// Init on-board RTC
 RTCZero rtc;
 
 // connection state
@@ -72,13 +73,15 @@ void setup() {
   // ------------ SD Card -----------------
   Serial.println("Initializing SD card...");
 
-  // see if the card is present and can be initialized:
+  // See if the card is present and can be initialized:
   if (!SD.begin(chipSelect)) {
-    Serial.println("Card failed, or not present");
-    // don't do anything more:
-    while (1);
+    Serial.println("SD Card initialization failed, or not present");
+    delay(500);
+    Serial.println("Data will not be written to SD Card");
   }
-  Serial.println("Card initialized.");
+  else{
+    Serial.println("SD Card initialized.");
+  }
 
   
   // ----------------------- BME -----------------------------
@@ -189,19 +192,19 @@ void loop() {
     uint16_t aStatusWord = 0u;
     delay(100);
     error = sensor.readMeasurementData(aFlow, aTemperature, aStatusWord);
-    // if (error != NO_ERROR) {
-    //     Serial.print("Error trying to execute readMeasurementData(): ");
-    //     errorToString(error, errorMessage, sizeof errorMessage);
-    //     Serial.println(errorMessage);
-    //     return;
-    // }
+    if (error != NO_ERROR) {
+        Serial.print("Error trying to execute readMeasurementData(): ");
+        errorToString(error, errorMessage, sizeof errorMessage);
+        Serial.println(errorMessage);
+        return;
+    }
   
-  // ----------------------- Sending Data to SD card -----------------
+  // ----------------------- Send Data to SD card -----------------
   delay(500);
   logDataToSD(currentMillis, aFlow, aTemperature, A_bme.temperature, A_bme.humidity, A_bme.pressure, A_bme.gas_resistance / 1000.0, A_TGS00, A_TGS02, A_TGS11, B_bme.temperature, B_bme.humidity, B_bme.pressure, B_bme.gas_resistance / 1000.0, B_TGS00, B_TGS02, B_TGS11);
   delay(500);
 
-  // ----------------------- Sending Data to SoraCOM------------------
+  // ----------------------- Send data to SoraCOM ------------------
   // Make sure the device is still connected to CatM network
   if (nbAccess.isAccessAlive()) {
     Serial.println("Sending..."); 
@@ -227,8 +230,6 @@ void loop() {
       serializeJson(doc, jsonBuffer); // print to client
       post_data(jsonBuffer); 
 
-      
-  
   } else {
     Serial.println("Modem disconnected, reconnecting");
     connected = false;
@@ -239,14 +240,17 @@ void loop() {
 }
 
 // ---------------------------- Time Synch ---------------------------
+// Synchronizes on-board RTC with the current world time
 void synchronizeRTC() {
   // Make an HTTP request to an NTP server
   HttpClient timeClient(client, "worldtimeapi.org", 80);
+  // Select time zone
   timeClient.get("/api/timezone/America/Denver");
 
   int statusCode = timeClient.responseStatusCode();
   String response = timeClient.responseBody();
 
+  // Read current time from worldtimeapi.org
   if (statusCode == 200) {
     StaticJsonDocument<600> doc;
     deserializeJson(doc, response);
@@ -265,25 +269,26 @@ void synchronizeRTC() {
 
 // ------------------------ SD Card Writing ----------------------------
 void logDataToSD(unsigned long currentMillis, float aFlow, float aTemperature, float A_TEMP, float A_Humidity, float A_Pressure, float A_Gas, int16_t A_TGS00, int16_t A_TGS02, int16_t A_TGS11, float B_TEMP, float B_Humidity, float B_Pressure, float B_Gas, int16_t B_TGS00, int16_t B_TGS02, int16_t B_TGS11) {
+  // boolean for writing column headers
   bool fileExists = SD.exists("datalog.csv");
   // Open the file for appending
   File dataFile = SD.open("datalog.csv", FILE_WRITE);
-
+  // if file does not exist yet (fileExists == FALSE), write preset column headers
   if (!fileExists) {
     dataFile.println("Year-Month-Day Hour/Min/Sec,aFlow,aTemperature,A_Temperature,A_Humidity,A_Pressure,A_Gas,A_TGS00,A_TGS02,A_TGS11,B_Temperature,B_Humidity,B_Pressure,B_Gas,B_TGS00,B_TGS02,B_TGS11");
     Serial.println("Header written to SD card");
   } 
 
-  // If the file is available, write to it
+  // If the file is open, write to it
   if (dataFile) {
+    // Read current time from RTC
+    int currentSeconds = rtc.getSeconds();
+    int currentMinutes = rtc.getMinutes();
+    int currentHours = rtc.getHours();
+    int currentDay = rtc.getDay();
+    int currentMonth = rtc.getMonth();
+    int currentYear = rtc.getYear();
     // Write the data
-  int currentSeconds = rtc.getSeconds();
-  int currentMinutes = rtc.getMinutes();
-  int currentHours = rtc.getHours();
-  int currentDay = rtc.getDay();
-  int currentMonth = rtc.getMonth();
-  int currentYear = rtc.getYear();
-    // Write the timestamp
     dataFile.print(String(currentYear) + "-" + String(currentMonth) + "-" + String(currentDay) + " " + String(currentHours) + ":" +
                      String(currentMinutes) + ":" + String(currentSeconds));
     dataFile.print(",");
@@ -326,7 +331,6 @@ void logDataToSD(unsigned long currentMillis, float aFlow, float aTemperature, f
   }
 }
 
-
 // --------------------------- Cellular ---------------------------
 void post_data(String postData) {
   Serial.println("making POST request");
@@ -342,7 +346,6 @@ void post_data(String postData) {
   Serial.println(statusCode);
   Serial.print("Response: ");
   Serial.println(response);
-
 }
 
 void start_and_connect_modem(){
