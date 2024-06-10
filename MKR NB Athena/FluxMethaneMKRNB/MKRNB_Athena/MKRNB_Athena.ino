@@ -6,6 +6,9 @@
 #include "Adafruit_BME680.h"
 #include "ADS1X15.h"
 #include <SensirionI2cSfmSf06.h>
+#include <SPI.h>
+#include <SD.h>
+#include <RTCZero.h>
 
 // macro definitions -------------------------------------
 // make sure that we use the proper definition of NO_ERROR
@@ -30,7 +33,8 @@ Adafruit_BME680 B_bme;
 ADS1115 A_ADS(0x48);
 ADS1115 B_ADS(0x49);
 
-
+// ----------------------- SD Card ---------------------------
+const int chipSelect = 4;  // SD card CS pin
 
 // Debug options
 #define PRINT_AT        true   // Show or hide AT command output from the modem
@@ -51,14 +55,35 @@ GPRS gprs;
 NB nbAccess(PRINT_AT);
 HttpClient http(client, server, port);
 
+// Init on-board RTC
+RTCZero rtc;
+
 // connection state
-  bool connected = false;
+bool connected = false;
 
 // Publish interval
 long previousMillis = 0; 
 long interval = 20000; // milliseconds
 
 void setup() {
+    //Initialize serial
+  Serial.begin(115200);
+  delay(1500);
+
+  // ------------ SD Card -----------------
+  Serial.println("Initializing SD card...");
+
+  // See if the card is present and can be initialized:
+  if (!SD.begin(chipSelect)) {
+    Serial.println("SD Card initialization failed, or not present");
+    delay(500);
+    Serial.println("Data will not be written to SD Card");
+  }
+  else{
+    Serial.println("SD Card initialized.");
+  }
+
+  
   // ----------------------- BME -----------------------------
   if(!A_bme.begin(BME_A_ADDRESS)){
     Serial.println("Could not find valid BME Ambiant Sensor..."); 
@@ -93,10 +118,12 @@ void setup() {
   digitalWrite(SARA_RESETN, LOW);
   pinMode(SARA_PWR_ON, OUTPUT);
   
-  //Initialize serial and wait for port to open:
-  Serial.begin(115200);
-  
+  // Wait for port to open
   start_and_connect_modem();
+
+  // Init RTC 
+  rtc.begin();
+  synchronizeRTC();
 
   //    ----------------------- FML -----------------------------
     sensor.begin(Wire, SFM4300_I2C_ADDR_2A);
@@ -172,7 +199,12 @@ void loop() {
         return;
     }
   
-  // ----------------------- Sending Data -----------------------------
+  // ----------------------- Send Data to SD card -----------------
+  delay(500);
+  logDataToSD(currentMillis, aFlow, aTemperature, A_bme.temperature, A_bme.humidity, A_bme.pressure, A_bme.gas_resistance / 1000.0, A_TGS00, A_TGS02, A_TGS11, B_bme.temperature, B_bme.humidity, B_bme.pressure, B_bme.gas_resistance / 1000.0, B_TGS00, B_TGS02, B_TGS11);
+  delay(500);
+
+  // ----------------------- Send data to SoraCOM ------------------
   // Make sure the device is still connected to CatM network
   if (nbAccess.isAccessAlive()) {
     Serial.println("Sending..."); 
@@ -198,17 +230,106 @@ void loop() {
       serializeJson(doc, jsonBuffer); // print to client
       post_data(jsonBuffer); 
 
-      
-  
   } else {
     Serial.println("Modem disconnected, reconnecting");
     connected = false;
-    connect_modem();
+    //connect_modem();
   }
 
   delay(5000); 
 }
 
+// ---------------------------- Time Synch ---------------------------
+// Synchronizes on-board RTC with the current world time
+void synchronizeRTC() {
+  // Make an HTTP request to an NTP server
+  HttpClient timeClient(client, "worldtimeapi.org", 80);
+  // Select time zone
+  timeClient.get("/api/timezone/America/Denver");
+
+  int statusCode = timeClient.responseStatusCode();
+  String response = timeClient.responseBody();
+
+  // Read current time from worldtimeapi.org
+  if (statusCode == 200) {
+    StaticJsonDocument<600> doc;
+    deserializeJson(doc, response);
+
+    const char* datetime = doc["utc_datetime"];
+    int year, month, day, hour, minute, second;
+    sscanf(datetime, "%d-%d-%dT%d:%d:%d", &year, &month, &day, &hour, &minute, &second);
+    year -= 2000;
+
+    rtc.setTime(hour, minute, second);
+    rtc.setDate(day, month, year);
+
+    Serial.println("RTC synchronized with NTP server");
+  }
+}
+
+// ------------------------ SD Card Writing ----------------------------
+void logDataToSD(unsigned long currentMillis, float aFlow, float aTemperature, float A_TEMP, float A_Humidity, float A_Pressure, float A_Gas, int16_t A_TGS00, int16_t A_TGS02, int16_t A_TGS11, float B_TEMP, float B_Humidity, float B_Pressure, float B_Gas, int16_t B_TGS00, int16_t B_TGS02, int16_t B_TGS11) {
+  // boolean for writing column headers
+  bool fileExists = SD.exists("datalog.csv");
+  // Open the file for appending
+  File dataFile = SD.open("datalog.csv", FILE_WRITE);
+  // if file does not exist yet (fileExists == FALSE), write preset column headers
+  if (!fileExists) {
+    dataFile.println("Year-Month-Day Hour/Min/Sec,aFlow,aTemperature,A_Temperature,A_Humidity,A_Pressure,A_Gas,A_TGS00,A_TGS02,A_TGS11,B_Temperature,B_Humidity,B_Pressure,B_Gas,B_TGS00,B_TGS02,B_TGS11");
+    Serial.println("Header written to SD card");
+  } 
+
+  // If the file is open, write to it
+  if (dataFile) {
+    // Read current time from RTC
+    int currentSeconds = rtc.getSeconds();
+    int currentMinutes = rtc.getMinutes();
+    int currentHours = rtc.getHours();
+    int currentDay = rtc.getDay();
+    int currentMonth = rtc.getMonth();
+    int currentYear = rtc.getYear();
+    // Write the data
+    dataFile.print(String(currentYear) + "-" + String(currentMonth) + "-" + String(currentDay) + " " + String(currentHours) + ":" +
+                     String(currentMinutes) + ":" + String(currentSeconds));
+    dataFile.print(",");
+    dataFile.print(aFlow);
+    dataFile.print(",");
+    dataFile.print(aTemperature);
+    dataFile.print(",");
+    dataFile.print(A_TEMP);
+    dataFile.print(",");
+    dataFile.print(A_Humidity);
+    dataFile.print(",");
+    dataFile.print(A_Pressure);
+    dataFile.print(",");
+    dataFile.print(A_Gas);
+    dataFile.print(",");
+    dataFile.print(A_TGS00);
+    dataFile.print(",");
+    dataFile.print(A_TGS02);
+    dataFile.print(",");
+    dataFile.print(A_TGS11);
+    dataFile.print(",");
+    dataFile.print(B_TEMP);
+    dataFile.print(",");
+    dataFile.print(B_Humidity);
+    dataFile.print(",");
+    dataFile.print(B_Pressure);
+    dataFile.print(",");
+    dataFile.print(B_Gas);
+    dataFile.print(",");
+    dataFile.print(B_TGS00);
+    dataFile.print(",");
+    dataFile.print(B_TGS02);
+    dataFile.print(",");
+    dataFile.print(B_TGS11);
+    dataFile.println();
+    dataFile.close();
+    Serial.println("Data written to SD card");
+  } else {
+    Serial.println("Error opening datalog.csv");
+  }
+}
 
 // --------------------------- Cellular ---------------------------
 void post_data(String postData) {
@@ -225,7 +346,6 @@ void post_data(String postData) {
   Serial.println(statusCode);
   Serial.print("Response: ");
   Serial.println(response);
-
 }
 
 void start_and_connect_modem(){
@@ -283,6 +403,7 @@ void connect_modem(){
   while (!connected) {
     if ((nbAccess.begin(PINNUMBER, apn, user, pass) == NB_READY) &&
         (gprs.attachGPRS() == GPRS_READY)) {
+      Serial.println("Connected Now");
       connected = true;
     } else {
       Serial.println("Not connected");
