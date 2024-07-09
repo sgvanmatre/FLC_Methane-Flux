@@ -35,7 +35,7 @@ Acknowledgments of contributors, libraries, etc.
 
 ## License
 
-Specify the license for your project.
+This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## Contact
 
