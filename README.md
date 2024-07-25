@@ -102,9 +102,9 @@ Thank you for your interest in contributing! Together, we can make this project 
 
 Contributors
 
-- **Principal Contributor:** Seth VanMatre
-- **Summer Contributions:** Sonie Taylor Schermer
-- **Additional Assistance:** Max Krauss
+- **Principal Contributor:** [Seth VanMatre](https://github.com/sgvanmatre)
+- **Summer Contributions:** [Sonie Taylor Schermer](https://github.com/tschermer02)
+- **Additional Assistance:** [Max Krauss](https://github.com/maxtkrauss)
 
 ## License
 
