@@ -11,7 +11,6 @@ This repository includes the PCB design and the microcontroller code for the sys
 ## Table of Contents
 
 - [Usage](#usage)
-- [Configuration](#configuration)
 - [Contributing](#contributing)
 - [Credits](#credits)
 - [License](#license)
@@ -19,19 +18,94 @@ This repository includes the PCB design and the microcontroller code for the sys
 
 ## Usage
 
-Examples and instructions for using your project.
+We encourage everyone to use or adapt this code for their own projects. Below are some examples and instructions to help you get started.
 
-## Configuration
+### Tools Used
 
-Details on any configuration or settings.
+- **Eagle PCB Software:** We used Eagle PCB software for designing and testing our printed circuit boards.
+- **Arduino:** Our code is compatible with the Arduino platform and was developed using the Arduino IDE and initialized on an Arduino MKR NB 1500 board. We did have to manually update the firmware. Instruction
+
+### Getting Started
+
+1. **Clone the Repository:**
+   - Clone the repository to your local machine using the following command:
+     ```sh
+     git clone https://github.com/your-username/your-repo-name.git
+     ```
+
+2. **Open in Eagle PCB Software:**
+   - Open the Eagle PCB files from the repository in Eagle PCB software to view and modify the PCB designs.
+
+3. **Load the Code in Arduino IDE:**
+   - Open the Arduino IDE.
+   - Load the Arduino code from the repository into the Arduino IDE.
+
+4. **Upload to Your Arduino Board:**
+   - Connect your Arduino board to your computer.
+   - Select the correct board and port from the Arduino IDE.
+   - Click the "Upload" button to upload the code to your Arduino board.
 
 ## Contributing
 
-Guidelines if you want others to contribute.
+## Contributing
+
+We welcome contributions from anyone who is interested! Whether it's fixing a bug, adding a new feature, improving documentation, or any other enhancements, your help is greatly appreciated.
+
+### How to Contribute
+
+1. **Fork the Repository:**
+   - Click the "Fork" button at the top right of this repository page to create a copy of this repository in your GitHub account.
+
+2. **Clone Your Fork:**
+   - Clone your forked repository to your local machine using the following command:
+     ```sh
+     git clone https://github.com/your-username/your-repo-name.git
+     ```
+
+3. **Create a New Branch:**
+   - Create a new branch to work on your changes:
+     ```sh
+     git checkout -b your-branch-name
+     ```
+
+4. **Make Your Changes:**
+   - Implement your changes in the new branch.
+
+5. **Commit Your Changes:**
+   - Commit your changes with a clear and concise commit message:
+     ```sh
+     git add .
+     git commit -m "Description of your changes"
+     ```
+
+6. **Push Your Changes:**
+   - Push your changes to your forked repository:
+     ```sh
+     git push origin your-branch-name
+     ```
+
+7. **Submit a Pull Request:**
+   - Go to the original repository on GitHub and click the "New Pull Request" button.
+   - Select your branch from your forked repository and compare it with the base repository.
+   - Submit the pull request for review.
+
+### Guidelines
+
+- Ensure your code follows the project's style guidelines.
+- Write clear, concise commit messages.
+- Update documentation as necessary.
+- Test your changes thoroughly before submitting a pull request.
+
+Thank you for your interest in contributing! Together, we can make this project even better.
+
 
 ## Credits
 
-Acknowledgments of contributors, libraries, etc.
+Contributors
+
+- **Principal Contributor:** Seth VanMatre
+- **Summer Contributions:** Sonie Taylor Schermer
+- **Additional Assistance:** Max Krauss
 
 ## License
 
